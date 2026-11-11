@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MH BRAND Namaz Time</string>
+    <string name="title_activity_main">MH BRAND Namaz Time</string>
+    <string name="package_name">com.mhbrand.namaztime</string>
+    <string name="custom_url_scheme">com.mhbrand.namaztime</string>
+</resources>
