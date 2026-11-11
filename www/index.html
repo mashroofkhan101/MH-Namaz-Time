@@ -2,49 +2,43 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MH BRAND Namaz Time</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#061b15;color:#fff;font-family:Arial,sans-serif;padding:20px}
-header{text-align:center;padding:22px 0}
-.logo{color:#e8c66a;font-size:13px;letter-spacing:4px}
-h1{color:#f4d77d;font-size:27px;margin:12px 0}
-.location{color:#b9cbbf;font-size:14px}
-.date{color:#d8bd72;margin:18px 0}
+body{margin:0;background:#061b15;color:white;font-family:Arial;padding:20px}
+header{text-align:center;padding:20px 0}
+.logo{color:#e8c66a;letter-spacing:4px;font-size:13px}
+h1{color:#f4d77d}
+.location,.small{color:#c2d3c8;font-size:14px}
+.date{color:#d8bd72;margin:15px}
 .card{background:#102d23;border:1px solid #315541;border-radius:16px;padding:18px;margin:12px 0}
 .next{background:linear-gradient(135deg,#204b37,#10251c)}
-.small{color:#c2d3c8;font-size:13px}
-.count{font-size:27px;color:#f3d47a;margin:12px 0}
-.prayer{display:flex;justify-content:space-between;padding:17px 5px;border-bottom:1px solid #315541}
-.prayer:last-child{border:0}
-.name{font-weight:bold}
+.count{font-size:28px;color:#f3d47a;margin:12px 0}
+.prayer{display:flex;justify-content:space-between;padding:16px 5px;border-bottom:1px solid #315541}
 .time{color:#f2d47c;font-weight:bold}
-button{background:#d9b85f;color:#142419;border:0;border-radius:10px;padding:13px 18px;font-weight:bold;margin:8px 3px}
-select{background:#183b2b;color:white;padding:10px;border-radius:8px;border:1px solid #d9b85f}
-footer{text-align:center;color:#9eaf9f;font-size:12px;padding:25px}
+button,select{background:#d9b85f;color:#142419;border:0;border-radius:9px;padding:12px;margin:5px;font-weight:bold}
+footer{text-align:center;color:#9eaf9f;padding:20px}
 </style>
+<script src="prayer.js"></script>
 </head>
 <body>
 <header>
 <div class="logo">MH BRAND PRESENTS</div>
 <h1>🕌 NAMAZ TIME</h1>
-<div class="location" id="location">Finding your location...</div>
+<div class="location" id="location">Location permission required</div>
 <div class="date" id="date">Loading date...</div>
 </header>
-
 <div class="card next">
 <div class="small">NEXT PRAYER</div>
 <h2 id="next">Loading...</h2>
 <div class="count" id="count">--:--:--</div>
 <div class="small">Time remaining</div>
 </div>
-
 <div class="card">
 <h3 style="color:#f3d47a">Today's Prayer Times</h3>
-<div id="prayers">Please allow location access...</div>
+<div id="prayers">Waiting for GPS location...</div>
 </div>
-
 <div class="card">
 <h3 style="color:#f3d47a">Settings</h3>
 <p class="small">Asr calculation</p>
@@ -52,61 +46,84 @@ footer{text-align:center;color:#9eaf9f;font-size:12px;padding:25px}
 <option value="1">Hanafi</option>
 <option value="0">Shafi / Standard</option>
 </select>
-<p class="small">Azan alarm: Full Azan (coming in next setup)</p>
+<br>
 <button onclick="getLocation()">Refresh Location</button>
 </div>
-
 <footer>MH BRAND NAMAZ TIME<br>May Allah bless your prayers 🤲</footer>
-
 <script>
-let timings={},nextTime=null,timer;
-const names=["Fajr","Sunrise","Dhuhr","Asr","Maghrib","Isha"];
-function getLocation(){
- document.getElementById("location").innerText="Finding location...";
- if(!navigator.geolocation){
- document.getElementById("location").innerText="Location not supported";return;
- }
- navigator.geolocation.getCurrentPosition(async p=>{
- let lat=p.coords.latitude,lon=p.coords.longitude;
+let timings={};
+let timer;
+
+async function getLocation(){
+ const loc=document.getElementById('location');
+ loc.innerText='Requesting GPS permission...';
  try{
- let r=await fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=1&school=${document.getElementById("school").value}`);
- let d=await r.json();
- timings=d.data.timings;
- document.getElementById("location").innerText=d.data.meta.timezone;
- document.getElementById("date").innerText=d.data.date.readable+" | "+d.data.date.hijri.date+" Hijri";
- showTimes();
- }catch(e){document.getElementById("location").innerText="Could not load prayer times. Check internet."}
- },()=>{document.getElementById("location").innerText="Location permission denied. Please allow GPS."},{enableHighAccuracy:true,timeout:15000});
+  const p=await window.getPrayerPosition();
+  const lat=p.coords.latitude;
+  const lon=p.coords.longitude;
+
+  loc.innerText='GPS found. Loading prayer times...';
+
+  const url=`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=1&school=${document.getElementById('school').value}`;
+  const response=await fetch(url);
+  if(!response.ok) throw new Error('Prayer service unavailable');
+
+  const result=await response.json();
+  if(result.code!==200) throw new Error('Prayer timings unavailable');
+
+  timings=result.data.timings;
+  const timezone=result.data.meta.timezone;
+  loc.innerText='📍 '+timezone;
+  document.getElementById('date').innerText=
+    result.data.date.readable+' | '+result.data.date.hijri.date+' Hijri';
+
+  showTimes();
+ }catch(e){
+  loc.innerText='GPS / Internet error: '+e.message;
+  document.getElementById('prayers').innerText=
+    'Location nahi mili. GPS aur permission check karein.';
+ }
 }
+
 function showTimes(){
- let list=[["Fajr","Fajr"],["Sunrise","Sunrise"],["Zuhr","Dhuhr"],["Asr","Asr"],["Maghrib","Maghrib"],["Isha","Isha"]];
- document.getElementById("prayers").innerHTML=list.map(([a,b])=>`<div class="prayer"><span class="name">${a}</span><span class="time">${timings[b]||"--"}</span></div>`).join("");
+ const list=[['Fajr','Fajr'],['Sunrise','Sunrise'],['Zuhr','Dhuhr'],['Asr','Asr'],['Maghrib','Maghrib'],['Isha','Isha']];
+ document.getElementById('prayers').innerHTML=list.map(([a,b])=>
+ `<div class="prayer"><span>${a}</span><span class="time">${timings[b]||'--'}</span></div>`
+ ).join('');
  updateCountdown();
 }
+
 function updateCountdown(){
  clearInterval(timer);
  function tick(){
- let now=new Date(),next=null,label="";
- for(let n of ["Fajr","Dhuhr","Asr","Maghrib","Isha"]){
- let t=timings[n];if(!t)continue;
- let [h,m]=t.split(" ")[0].split(":").map(Number);
- let x=new Date();x.setHours(h,m,0,0);
- if(x>now){next=x;label=n;break}
+  const now=new Date();
+  let next=null,label='';
+  for(const n of ['Fajr','Dhuhr','Asr','Maghrib','Isha']){
+   if(!timings[n])continue;
+   const [h,m]=timings[n].split(' ')[0].split(':').map(Number);
+   const x=new Date();
+   x.setHours(h,m,0,0);
+   if(x>now){next=x;label=n;break;}
+  }
+  if(!next){
+   const [h,m]=timings.Fajr.split(' ')[0].split(':').map(Number);
+   next=new Date();
+   next.setDate(next.getDate()+1);
+   next.setHours(h,m,0,0);
+   label='Fajr';
+  }
+  document.getElementById('next').innerText=label;
+  let s=Math.max(0,Math.floor((next-now)/1000));
+  const hh=String(Math.floor(s/3600)).padStart(2,'0');
+  const mm=String(Math.floor(s%3600/60)).padStart(2,'0');
+  const ss=String(s%60).padStart(2,'0');
+  document.getElementById('count').innerText=`${hh}:${mm}:${ss}`;
  }
- if(!next){
- let t=timings.Fajr.split(" ")[0].split(":").map(Number);
- next=new Date();next.setDate(next.getDate()+1);next.setHours(t[0],t[1],0,0);label="Fajr";
- }
- document.getElementById("next").innerText=label;
- let s=Math.max(0,Math.floor((next-now)/1000));
- let h=String(Math.floor(s/3600)).padStart(2,"0");
- let m=String(Math.floor(s%3600/60)).padStart(2,"0");
- let sec=String(s%60).padStart(2,"0");
- document.getElementById("count").innerText=h+":"+m+":"+sec;
- }
- tick();timer=setInterval(tick,1000);
+ tick();
+ timer=setInterval(tick,1000);
 }
-document.getElementById("school").onchange=getLocation;
+
+document.getElementById('school').onchange=getLocation;
 getLocation();
 </script>
 </body>
